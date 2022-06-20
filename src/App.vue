@@ -1,26 +1,23 @@
 <script setup>
 import { onBeforeMount, onMounted, reactive, ref, watch } from "vue";
+import ElevatorShaft from "./components/Elevator-shaft.vue";
+import ElevatorBtn from "./components/Elevator-btn.vue";
+import { countOfFloors, floorHeight } from "../houseSetting";
 const position = ref(0.5);
 const currentFloor = ref(1);
 const directionFloor = ref(0);
 const liftDirection = ref(true);
 const currentStopedFloor = ref(1);
-const btnsState = reactive({
-  1: false,
-  2: false,
-  3: false,
-  4: false,
-  5: false,
-});
+const btnsState = reactive({});
 const lifting = ref(false);
 const elevatorIsRest = ref(false);
 const queue = ref([]);
 const moving = () => {
   if (liftDirection.value) {
-    position.value += 20;
+    position.value += floorHeight;
     currentFloor.value++;
   } else {
-    position.value -= 20;
+    position.value -= floorHeight;
     currentFloor.value--;
   }
 };
@@ -72,6 +69,9 @@ watch(lifting, (newLifting) => {
   sessionStorage.setItem("lifting", newLifting);
 });
 onBeforeMount(() => {
+  for (let i = 1; i <= countOfFloors; i++) {
+    btnsState[i] = false;
+  }
   const _btnsState = JSON.parse(sessionStorage.getItem("btnsState"));
   if (_btnsState) {
     for (let key in _btnsState) {
@@ -87,7 +87,7 @@ onBeforeMount(() => {
   const _currentFloor = +sessionStorage.getItem("currentFloor");
   if (_currentFloor) {
     currentFloor.value = _currentFloor;
-    position.value = 0.5 + (currentFloor.value - 1) * 20;
+    position.value = 0.5 + (currentFloor.value - 1) * floorHeight;
   }
 });
 onMounted(() => {
@@ -112,44 +112,32 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="container">
-    <div class="floor">
-      <button :class="{ btn_active: btnsState[1] }" @click="moveOrQue(1)">
-        <div></div>
-      </button>
-    </div>
-    <div class="floor">
-      <button :class="{ btn_active: btnsState[2] }" @click="moveOrQue(2)">
-        <div></div>
-      </button>
-    </div>
-    <div class="floor">
-      <button :class="{ btn_active: btnsState[3] }" @click="moveOrQue(3)">
-        <div></div>
-      </button>
-    </div>
-    <div class="floor">
+  <div class="wrapper">
+    <ElevatorShaft
+      v-for="n in 4"
+      :key="n"
+      :count="countOfFloors"
+      :height="floorHeight"
+      :elevatorIsRest="elevatorIsRest"
+      :position="position"
+      :lifting="lifting"
+      :directionFloor="directionFloor"
+      :liftDirection="liftDirection"
+    ></ElevatorShaft>
+    <!-- <div class="floor">
       <button :class="{ btn_active: btnsState[4] }" @click="moveOrQue(4)">
         <div></div>
       </button>
-    </div>
-    <div class="floor">
-      <button :class="{ btn_active: btnsState[5] }" @click="moveOrQue(5)">
-        <div></div>
-      </button>
-    </div>
-    <div
-      class="elevator"
-      :class="{ elevator_rest: elevatorIsRest }"
-      :style="{
-        bottom: `${position}vh`,
-      }"
-    >
-      <p :class="{ showDirection: lifting || elevatorIsRest }">
-        <span v-if="liftDirection">&uarr;</span>
-        <span v-else>&darr;</span>
-        <span>{{ directionFloor }}</span>
-      </p>
+    </div> -->
+    <div class="container">
+      <ElevatorBtn
+        v-for="n in countOfFloors"
+        :key="n"
+        :number="n"
+        :stateOfBtn="btnsState[n]"
+        :style="{ height: `${floorHeight}vh` }"
+        :action="moveOrQue"
+      ></ElevatorBtn>
     </div>
   </div>
 </template>
@@ -160,79 +148,40 @@ onMounted(() => {
   padding: 0;
 }
 
+.wrapper {
+  display: flex;
+}
+
 .container {
   position: relative;
   display: flex;
   flex-direction: column-reverse;
-  padding-left: 45px;
   counter-reset: floor;
+  padding-left: 15px;
+
+  &:first-of-type {
+    padding-left: 45px;
+
+    & > .elevator {
+      left: 46px;
+    }
+  }
 }
 
 .floor {
   width: 100px;
-  height: 20vh;
   border-right: 1px solid #000;
   border-left: 1px solid #000;
   position: relative;
   border-bottom: 0.5px solid rgba(128, 128, 128, 0.5);
-
-  & > button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 25px;
-    height: 25px;
-    background-color: #fff;
-    position: absolute;
-    counter-increment: floor;
-    top: 10vh;
-    right: -50px;
-    cursor: pointer;
-    font-size: 18px;
-    border: 1px solid #0079a7;
-    border-radius: 4px;
-    transition: box-shadow 0.2s linear, border-color 0.2s linear;
-
-    &:hover {
-      box-shadow: 0px 0px 5px #0079a7;
-    }
-
-    & > div {
-      width: 50%;
-      height: 50%;
-      border-radius: 100%;
-      background-color: #0079a7;
-      transition: background-color 0.3s;
-    }
-
-    &::after {
-      content: counter(floor);
-      position: absolute;
-      top: -2rem;
-      left: 0;
-    }
-  }
-
-  & > .btn_active {
-    border-color: #e25300;
-
-    &:hover {
-      box-shadow: 0px 0px 5px #e25300;
-    }
-
-    & > div {
-      background-color: #e25300;
-    }
-  }
 }
 
 .elevator {
   background-color: #00fefe;
   width: 100px;
-  height: 20vh;
   position: absolute;
   bottom: 0.5vh;
-  left: 46px;
+  left: 15px;
   transition: bottom 1s linear;
 
   &_rest {
