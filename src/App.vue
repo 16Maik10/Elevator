@@ -1,81 +1,77 @@
 <script setup>
-import { onBeforeMount, onMounted, reactive, ref, watch } from "vue";
+import { onBeforeMount, reactive, ref, watch } from "vue";
 import ElevatorShaft from "./components/Elevator-shaft.vue";
 import ElevatorBtn from "./components/Elevator-btn.vue";
-import { countOfFloors, floorHeight } from "../houseSetting";
-const position = ref(0.5);
-const currentFloor = ref(1);
-const directionFloor = ref(0);
-const liftDirection = ref(true);
-const currentStopedFloor = ref(1);
+import { countOfFloors, floorHeight, countOfShafts } from "../houseSetting";
+const stateOfLifts = ref([]);
+const currentFloors = ref([]);
+const currentStoppedFloors = ref([]);
 const btnsState = reactive({});
-const lifting = ref(false);
-const elevatorIsRest = ref(false);
 const queue = ref([]);
-const moving = () => {
-  if (liftDirection.value) {
-    position.value += floorHeight;
-    currentFloor.value++;
-  } else {
-    position.value -= floorHeight;
-    currentFloor.value--;
-  }
-};
-const setPosition = (floor, currentTiming, wasMoving = false) => {
-  lifting.value = true;
-  directionFloor.value = floor;
-  if (!wasMoving) {
-    moving();
-  }
-  const IID = setInterval(moving, 1001);
-  setTimeout(() => {
-    clearInterval(IID);
-    btnsState[floor] = false;
-    currentStopedFloor.value = currentFloor.value;
-    setTimeout(() => {
-      elevatorIsRest.value = false;
-      moveOrQue(queue.value.shift());
-    }, 3000);
-    lifting.value = false;
-    elevatorIsRest.value = true;
-  }, currentTiming);
-};
+const Funcs = reactive({});
 const moveOrQue = (floor) => {
-  if (!floor || floor === currentStopedFloor.value) {
+  if (!floor || currentStoppedFloors.value.includes(floor)) {
     return;
   }
   btnsState[floor] = true;
-  currentStopedFloor.value = 0;
-  if (lifting.value || elevatorIsRest.value) {
+  if (!stateOfLifts.value.includes(true)) {
     !queue.value.includes(floor) && queue.value.push(floor);
   } else {
-    liftDirection.value = floor > currentFloor.value;
-    setPosition(floor, Math.abs(floor - currentFloor.value) * 1000);
+    const lift = stateOfLifts.value.indexOf(true) + 1;
+    currentStoppedFloors.value[lift - 1] = 0;
+    Funcs[lift](floor, Math.abs(floor - currentFloors.value[lift - 1]) * 1000);
   }
 };
+const logState = (data) => {
+  const [state, order, currentFloorOfLift, currentStoppedFloorOfLift] = data;
+  currentFloors.value[order - 1] = currentFloorOfLift;
+  currentStoppedFloors.value[order - 1] = currentStoppedFloorOfLift;
+  stateOfLifts.value[order - 1] = state;
+  if (stateOfLifts.value.includes(true) && queue.value.length > 0) {
+    const lift = stateOfLifts.value.indexOf(true) + 1;
+    const floor = queue.value.shift();
+    Funcs[lift](floor, Math.abs(floor - currentFloors.value[lift - 1]) * 1000);
+  }
+};
+const setFuncs = (data) => {
+  const [func, order] = data;
+  Funcs[order] = func;
+};
+const setBtnState = (floor) => {
+  btnsState[floor] = false;
+};
+watch(stateOfLifts.value, (newStateOfLifts) => {
+  sessionStorage.setItem("stateOfLifts", JSON.stringify(newStateOfLifts));
+});
 watch(btnsState, (newBtnsState) => {
   sessionStorage.setItem("btnsState", JSON.stringify(newBtnsState));
 });
 watch(queue.value, (newQueue) => {
   sessionStorage.setItem("queue", JSON.stringify(newQueue));
 });
-watch(directionFloor, (newDirectionFloor) => {
-  sessionStorage.setItem("directionFloor", newDirectionFloor);
-});
-watch(currentFloor, (newCurrentFloor) => {
-  sessionStorage.setItem("currentFloor", newCurrentFloor);
-});
-watch(lifting, (newLifting) => {
-  sessionStorage.setItem("lifting", newLifting);
+watch(currentFloors.value, (newCurrentFloor) => {
+  sessionStorage.setItem("currentFloor", JSON.stringify(newCurrentFloor));
 });
 onBeforeMount(() => {
-  for (let i = 1; i <= countOfFloors; i++) {
-    btnsState[i] = false;
+  const _stateOfLifts = JSON.parse(sessionStorage.getItem("stateOfLifts"));
+  for (let i = 1; i <= countOfShafts; i++) {
+    currentFloors.value.push(1);
+    currentStoppedFloors.value.push(1);
+    if (!_stateOfLifts) {
+      stateOfLifts.value.push(true);
+    }
+  }
+  if (_stateOfLifts) {
+    stateOfLifts.value = _stateOfLifts;
   }
   const _btnsState = JSON.parse(sessionStorage.getItem("btnsState"));
   if (_btnsState) {
     for (let key in _btnsState) {
       btnsState[key] = _btnsState[key];
+    }
+  } else {
+    for (let i = 1; i <= countOfFloors; i++) {
+      btnsState[i] = false;
     }
   }
   const _queue = JSON.parse(sessionStorage.getItem("queue"));
@@ -84,51 +80,21 @@ onBeforeMount(() => {
       queue.value.push(value);
     }
   }
-  const _currentFloor = +sessionStorage.getItem("currentFloor");
-  if (_currentFloor) {
-    currentFloor.value = _currentFloor;
-    position.value = 0.5 + (currentFloor.value - 1) * floorHeight;
-  }
-});
-onMounted(() => {
-  const _directionFloor = +sessionStorage.getItem("directionFloor");
-  if (_directionFloor) {
-    liftDirection.value = _directionFloor > currentFloor.value;
-    const _lifting = sessionStorage.getItem("lifting");
-    if (_lifting === "true") {
-      setPosition(
-        _directionFloor,
-        Math.abs(_directionFloor - currentFloor.value) * 1000
-      );
-    } else {
-      setPosition(
-        _directionFloor,
-        Math.abs(_directionFloor - currentFloor.value) * 1000,
-        true
-      );
-    }
-  }
 });
 </script>
 
 <template>
   <div class="wrapper">
     <ElevatorShaft
-      v-for="n in 4"
+      v-for="n in countOfShafts"
       :key="n"
       :count="countOfFloors"
+      :order="n"
       :height="floorHeight"
-      :elevatorIsRest="elevatorIsRest"
-      :position="position"
-      :lifting="lifting"
-      :directionFloor="directionFloor"
-      :liftDirection="liftDirection"
+      @editData="logState"
+      @init="setFuncs"
+      @setBtnState="setBtnState"
     ></ElevatorShaft>
-    <!-- <div class="floor">
-      <button :class="{ btn_active: btnsState[4] }" @click="moveOrQue(4)">
-        <div></div>
-      </button>
-    </div> -->
     <div class="container">
       <ElevatorBtn
         v-for="n in countOfFloors"
